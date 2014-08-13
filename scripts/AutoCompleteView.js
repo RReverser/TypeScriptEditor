@@ -5,9 +5,9 @@ define(["require", "exports"], function(require, exports) {
         function AutoCompleteView(autoComplete) {
             this.autoComplete = autoComplete;
             this.selectedClassName = "ace_autocomplete_selected";
-            this.wrap = $('<div class="ace_autocomplete_selected" style="display: none; position: fixed; z-index: 1000" />');
+            this.current = null;
+            this.wrap = $('<div class="ace_autocomplete" style="display: none; position: fixed; z-index: 1000" />');
             this.listElement = $('<ul style="list-style-type: none" />').appendTo(this.wrap);
-            this.current = $();
             this.editor = autoComplete.editor;
             this.wrap.appendTo(this.editor.container);
         }
@@ -17,6 +17,7 @@ define(["require", "exports"], function(require, exports) {
 
         AutoCompleteView.prototype.hide = function () {
             this.wrap.hide();
+            this.listElement.empty();
         };
 
         AutoCompleteView.prototype.setPosition = function (coords) {
@@ -32,8 +33,8 @@ define(["require", "exports"], function(require, exports) {
 
         AutoCompleteView.prototype.focus = function (item) {
             if (item.length) {
-                this.current.removeClass(this.selectedClassName);
-                item.addClass(this.selectedClassName);
+                this.current && this.current.removeClass(this.selectedClassName);
+                this.current = item.addClass(this.selectedClassName);
                 this.adjustPosition();
             }
         };
@@ -47,24 +48,24 @@ define(["require", "exports"], function(require, exports) {
         };
 
         AutoCompleteView.prototype.ensureFocus = function () {
-            if (!this.current.length) {
+            if (!this.current) {
                 this.focus(this.listElement.children(':first-child'));
             }
         };
 
         AutoCompleteView.prototype.adjustPosition = function () {
-            if (!this.current.length) {
+            if (!this.current) {
                 return;
             }
             var wrapHeight = this.wrap.height();
             var elmOuterHeight = this.current.outerHeight();
-            var preMargin = parseInt(this.listElement.css("margin-top").replace('px', ''), 10);
+            var preMargin = parseInt(this.listElement.css('margin-top').replace('px', ''), 10);
             var pos = this.current.position();
             if (pos.top >= (wrapHeight - elmOuterHeight)) {
-                this.listElement.css("margin-top", (preMargin - elmOuterHeight) + 'px');
+                this.listElement.css('margin-top', (preMargin - elmOuterHeight) + 'px');
             }
             if (pos.top < 0) {
-                return this.listElement.css("margin-top", (-pos.top + preMargin) + 'px');
+                return this.listElement.css('margin-top', (-pos.top + preMargin) + 'px');
             }
         };
 
@@ -72,11 +73,12 @@ define(["require", "exports"], function(require, exports) {
             if (infos.length > 0) {
                 this.listElement.html(infos.map(function (info) {
                     var name = '<span class="label-name">' + info.name + '</span>';
-                    var type = info.type ? '<span class="label-type">' + info.type + '</span>' : '';
+                    var type = '<span class="label-type">' + info.type + '</span>';
                     var kind = '<span class="label-kind label-kind-' + info.kind + '">' + info.kind.charAt(0) + '</span>';
 
                     return '<li data-name="' + info.name + '">' + kind + name + type + '</li>';
                 }).join(''));
+                this.current = null;
 
                 this.show();
                 this.ensureFocus();
@@ -90,3 +92,4 @@ define(["require", "exports"], function(require, exports) {
     
     return AutoCompleteView;
 });
+//# sourceMappingURL=AutoCompleteView.js.map

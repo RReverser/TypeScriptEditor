@@ -4,13 +4,13 @@ requirejs.config({
     }
 });
 
-define(function(require, exports, module) {
+define(function (require, exports, module) {
     var ace = require('ace/ace');
     var AceRange = require('ace/range').Range;
-    var AutoComplete= require('AutoComplete');
+    var AutoComplete = require('AutoComplete');
     var lang = require('ace/lib/lang');
     var EditorPosition = require('EditorPosition');
-    var CompilationService =  require('CompilationService');
+    var CompilationService = require('CompilationService');
     var deferredCall = require('ace/lib/lang').deferredCall;
     var net = require('ace/lib/net');
 
@@ -22,7 +22,7 @@ define(function(require, exports, module) {
     var outputEditor = null;
     var typeCompilationService = null;
     var docUpdateCount = 0;
-    var typeScriptLS =  new TypeScriptLS();
+    var typeScriptLS = new TypeScriptLS();
     var ServicesFactory = new TypeScript.Services.TypeScriptServicesFactory();
     var serviceShim = ServicesFactory.createLanguageServiceShim(typeScriptLS);
 
@@ -31,9 +31,9 @@ define(function(require, exports, module) {
     var syncStop = false; //for stop sync on loadfile
     var autoComplete = null;
     var refMarkers = [];
-    var errorMarkers =[];
+    var errorMarkers = [];
 
-    function loadTypeScriptLibrary(){
+    function loadTypeScriptLibrary() {
         var libnames = [
             'typescripts/lib.d.ts'
         ];
@@ -43,35 +43,35 @@ define(function(require, exports, module) {
         var iArgs = 'interface IArguments {           [index: number]: any;        length: number;        callee: Function;    }';
         typeScriptLS.addScript('start.d.ts', iArgs, true);
 
-        libnames.forEach(function(libname){
-            net.get(libname, function(content){
-                typeScriptLS.addScript(libname, content.replace(/\r\n?/g,'\n'), true);
+        libnames.forEach(function (libname) {
+            net.get(libname, function (content) {
+                typeScriptLS.addScript(libname, content.replace(/\r\n?/g, '\n'), true);
             });
         });
     }
 
     function loadFile(filename) {
-        net.get(filename, function(content){
+        net.get(filename, function (content) {
             selectFileName = filename;
             syncStop = true;
-            var data= content.replace(/\r\n?/g,'\n');
+            var data = content.replace(/\r\n?/g, '\n');
             editor.setValue(data);
             editor.moveCursorTo(0, 0);
-            typeScriptLS.updateScript(filename, editor.getSession().getDocument().getValue() , false);
+            typeScriptLS.updateScript(filename, editor.getSession().getDocument().getValue(), false);
             syncStop = false;
         });
     }
 
-    function startAutoComplete(editor){
-        if (!autoComplete.active){
+    function startAutoComplete(editor) {
+        if (!autoComplete.active) {
             autoComplete.setScriptName(selectFileName);
             autoComplete.activate();
         }
     }
 
-    function onUpdateDocument(e){
-        if (selectFileName){
-            if (!syncStop){
+    function onUpdateDocument(e) {
+        if (selectFileName) {
+            if (!syncStop) {
                 syncTypeScriptServiceContent(selectFileName, e);
                 updateMarker(e);
             }
@@ -79,7 +79,7 @@ define(function(require, exports, module) {
     }
 
 // TODO check column
-    function updateMarker(aceChangeEvent){
+    function updateMarker(aceChangeEvent) {
         var data = aceChangeEvent.data;
         var action = data.action;
         var range = data.range;
@@ -87,35 +87,35 @@ define(function(require, exports, module) {
         var line_count = 0;
         var isNewLine = editor.getSession().getDocument().isNewLine;
 
-        if(action == 'insertText'){
-            if(isNewLine(data.text)){
+        if (action == 'insertText') {
+            if (isNewLine(data.text)) {
                 line_count = 1;
             }
-        }else if(action == 'insertLines'){
+        } else if (action == 'insertLines') {
             line_count = data.lines.length;
 
-        }else if (action == 'removeText') {
-            if(isNewLine(data.text)){
+        } else if (action == 'removeText') {
+            if (isNewLine(data.text)) {
                 line_count = -1;
             }
 
-        }else if (action == 'removeLines'){
+        } else if (action == 'removeLines') {
             line_count = -data.lines.length;
         }
 
-        if(line_count != 0){
+        if (line_count != 0) {
 
-            var markerUpdate = function(id){
+            var markerUpdate = function (id) {
                 var marker = markers[id];
                 var row = range.start.row;
 
-                if(line_count > 0){
+                if (line_count > 0) {
                     row = +1;
                 }
 
-                if(marker && marker.range.start.row > row ){
-                    marker.range.start.row += line_count ;
-                    marker.range.end.row += line_count ;
+                if (marker && marker.range.start.row > row) {
+                    marker.range.start.row += line_count;
+                    marker.range.end.row += line_count;
                 }
             };
 
@@ -133,26 +133,26 @@ define(function(require, exports, module) {
     }
 
 //sync LanguageService content and ace editor content
-    function syncTypeScriptServiceContent(script, aceChangeEvent){
+    function syncTypeScriptServiceContent(script, aceChangeEvent) {
 
         var data = aceChangeEvent.data;
         var action = data.action;
         var range = data.range;
         var start = aceEditorPosition.getPositionChars(range.start);
 
-        if(action == 'insertText'){
-            editLanguageService(script, new TextEdit(start , start, data.text));
-        }else if(action == 'insertLines'){
+        if (action == 'insertText') {
+            editLanguageService(script, new TextEdit(start, start, data.text));
+        } else if (action == 'insertLines') {
 
-            var text = data.lines.map(function(line) {
-                return line+ '\n'; //TODO newline hard code
+            var text = data.lines.map(function (line) {
+                return line + '\n'; //TODO newline hard code
             }).join('');
-            editLanguageService(script,new TextEdit(start , start, text));
+            editLanguageService(script, new TextEdit(start, start, text));
 
-        }else if (action == 'removeText') {
+        } else if (action == 'removeText') {
             var end = start + data.text.length;
             editLanguageService(script, new TextEdit(start, end, ''));
-        }else if (action == 'removeLines'){
+        } else if (action == 'removeLines') {
             var len = aceEditorPosition.getLinesChars(data.lines);
             var end = start + len;
             editLanguageService(script, new TextEdit(start, end, ''));
@@ -160,32 +160,32 @@ define(function(require, exports, module) {
     };
 
 
-    function editLanguageService(name, textEdit){
+    function editLanguageService(name, textEdit) {
         typeScriptLS.editScript(name, textEdit.minChar, textEdit.limChar, textEdit.text);
     }
 
-    function onChangeCursor(e){
-        if(!syncStop){
+    function onChangeCursor(e) {
+        if (!syncStop) {
             deferredShowOccurrences.schedule(200);
         }
     };
 
-    function languageServiceIndent(){
+    function languageServiceIndent() {
         var cursor = editor.getCursorPosition();
         var lineNumber = cursor.row;
 
-        var text  = editor.session.getLine(lineNumber);
+        var text = editor.session.getLine(lineNumber);
         var matches = text.match(/^[\t ]*/);
         var preIndent = 0;
         var wordLen = 0;
 
-        if(matches){
+        if (matches) {
             wordLen = matches[0].length;
-            for(var i = 0; i < matches[0].length; i++){
+            for (var i = 0; i < matches[0].length; i++) {
                 var elm = matches[0].charAt(i);
-                var spaceLen = (elm == ' ') ? 1: editor.session.getTabSize();
+                var spaceLen = (elm == ' ') ? 1 : editor.session.getTabSize();
                 preIndent += spaceLen;
-            };
+            }
         }
 
         var option = new TypeScript.Services.EditorOptions();
@@ -193,19 +193,19 @@ define(function(require, exports, module) {
 
         var smartIndent = serviceShim.languageService.getSmartIndentAtLineNumber(selectFileName, lineNumber, option);
 
-        if(preIndent > smartIndent){
+        if (preIndent > smartIndent) {
             editor.indent();
-        }else{
+        } else {
             var indent = smartIndent - preIndent;
 
-            if(indent > 0){
+            if (indent > 0) {
                 editor.getSelection().moveCursorLineStart();
-                editor.commands.exec('inserttext', editor, {text:' ', times:indent});
+                editor.commands.exec('inserttext', editor, {text: ' ', times: indent});
             }
 
-            if( cursor.column > wordLen){
+            if (cursor.column > wordLen) {
                 cursor.column += indent;
-            }else{
+            } else {
                 cursor.column = indent + wordLen;
             }
 
@@ -213,10 +213,10 @@ define(function(require, exports, module) {
         }
     }
 
-    function refactor(){
+    function refactor() {
         var references = serviceShim.languageService.getOccurrencesAtPosition(selectFileName, aceEditorPosition.getCurrentCharPosition());
 
-        references.forEach(function(ref){
+        references.forEach(function (ref) {
             var getpos = aceEditorPosition.getAcePositionFromChars;
             var start = getpos(ref.ast.minChar);
             var end = getpos(ref.ast.limChar);
@@ -225,13 +225,13 @@ define(function(require, exports, module) {
         });
     }
 
-    function showOccurrences(){
+    function showOccurrences() {
         var references = serviceShim.languageService.getOccurrencesAtPosition(selectFileName, aceEditorPosition.getCurrentCharPosition());
         var session = editor.getSession();
-        refMarkers.forEach(function (id){
+        refMarkers.forEach(function (id) {
             session.removeMarker(id);
         });
-        references.forEach(function(ref){
+        references.forEach(function (ref) {
             //TODO check script name
             // console.log(ref.unitIndex);
             var getpos = aceEditorPosition.getAcePositionFromChars;
@@ -244,15 +244,15 @@ define(function(require, exports, module) {
 
     var deferredShowOccurrences = deferredCall(showOccurrences);
 
-    function Compile(typeScriptContent){
+    function Compile(typeScriptContent) {
         var output = '';
 
         var outfile = {
             Write: function (s) {
-                output  += s;
+                output += s;
             },
             WriteLine: function (s) {
-                output  += s + '\n';
+                output += s + '\n';
             },
             Close: function () {
             }
@@ -275,24 +275,24 @@ define(function(require, exports, module) {
         return output;
     }
 
-    function workerOnCreate(func, timeout){
-        if(editor.getSession().$worker){
+    function workerOnCreate(func, timeout) {
+        if (editor.getSession().$worker) {
             func(editor.getSession().$worker);
-        }else{
-            setTimeout(function(){
+        } else {
+            setTimeout(function () {
                 workerOnCreate(func, timeout);
             });
         }
     }
 
-    function javascriptRun(){
+    function javascriptRun() {
         var external = window.open();
         var script = external.window.document.createElement('script');
         script.textContent = outputEditor.getSession().doc.getValue();
         external.window.document.body.appendChild(script);
     }
 
-    $(function(){
+    $(function () {
         editor = ace.edit('editor');
         editor.setTheme('ace/theme/github');
         editor.getSession().setMode('ace/mode/typescript');
@@ -300,8 +300,8 @@ define(function(require, exports, module) {
         outputEditor = ace.edit('output');
         outputEditor.setTheme('ace/theme/github');
         outputEditor.getSession().setMode('ace/mode/javascript');
-        document.getElementById('editor').style.fontSize='14px';
-        document.getElementById('output').style.fontSize='14px';
+        document.getElementById('editor').style.fontSize = '14px';
+        document.getElementById('output').style.fontSize = '14px';
 
         loadTypeScriptLibrary();
         loadFile('samples/greeter.ts');
@@ -309,30 +309,27 @@ define(function(require, exports, module) {
         editor.addEventListener('change', onUpdateDocument);
         editor.addEventListener('changeSelection', onChangeCursor);
 
-        editor.commands.addCommands([{
-            name:'autoComplete',
-            bindKey:'Ctrl-Space',
-            exec:function(editor) {
-                startAutoComplete(editor);
-            }
-        }]);
-
-        editor.commands.addCommands([{
-            name:'refactor',
-            bindKey: 'F2',
-            exec:function(editor) {
-                refactor();
-            }
-        }]);
-
-        editor.commands.addCommands([{
-            name: 'indent',
-            bindKey: 'Tab',
-            exec: function(editor) {
-                languageServiceIndent();
+        editor.commands.addCommands({
+            autoComplete: {
+                bindKey: 'Ctrl-Space',
+                exec: function (editor) {
+                    startAutoComplete(editor);
+                }
             },
-            multiSelectAction: 'forEach'
-        }]);
+            refactor: {
+                bindKey: 'F2',
+                exec: function (editor) {
+                    refactor();
+                }
+            },
+            indent: {
+                bindKey: 'Tab',
+                exec: function (editor) {
+                    languageServiceIndent();
+                },
+                multiSelectAction: 'forEach'
+            }
+        });
 
         aceEditorPosition = new EditorPosition(editor);
         typeCompilationService = new CompilationService(editor, serviceShim);
@@ -340,10 +337,10 @@ define(function(require, exports, module) {
 
         // override editor onTextInput
         var originalTextInput = editor.onTextInput;
-        editor.onTextInput = function (text){
+        editor.onTextInput = function (text) {
             originalTextInput.call(editor, text);
-            if(text == '.'){
-                editor.commands.exec('autoComplete');
+            if (text === '.') {
+                editor.commands.exec('autoComplete', editor);
             } else {
                 var doc = editor.getSession().getDocument();
                 if (doc.isNewLine(text)) {
@@ -351,29 +348,29 @@ define(function(require, exports, module) {
                     var option = {};
                     option.NewLineCharacter = '\n';
                     var indent = serviceShim.languageService.getIndentationAtPosition(selectFileName, pos, option);
-                    if(indent > 0) {
-                        editor.commands.exec('inserttext', editor, {text:' ', times:indent});
+                    if (indent > 0) {
+                        editor.commands.exec('inserttext', editor, {text: ' ', times: indent});
                     }
                 }
             }
         };
 
-        editor.addEventListener('mousedown', function(e){
+        editor.addEventListener('mousedown', function (e) {
             if (autoComplete.active) {
                 autoComplete.deactivate();
             }
         });
 
-        editor.getSession().on('compiled', function(e){
+        editor.getSession().on('compiled', function (e) {
             outputEditor.getSession().doc.setValue(e.data);
         });
 
-        editor.getSession().on('compileErrors', function(e){
+        editor.getSession().on('compileErrors', function (e) {
             var session = editor.getSession();
-            errorMarkers.forEach(function (id){
+            errorMarkers.forEach(function (id) {
                 session.removeMarker(id);
             });
-            e.data.forEach(function(error){
+            e.data.forEach(function (error) {
                 var getpos = aceEditorPosition.getAcePositionFromChars;
                 var start = getpos(error.minChar);
                 var end = getpos(error.limChar);
@@ -382,26 +379,26 @@ define(function(require, exports, module) {
             });
         });
 
-        workerOnCreate(function(){//TODO use worker init event
+        workerOnCreate(function () {//TODO use worker init event
 
-            ['typescripts/lib.d.ts'].forEach(function(libname){
-                net.get(libname, function(content){
+            ['typescripts/lib.d.ts'].forEach(function (libname) {
+                net.get(libname, function (content) {
                     var params = {
                         data: {
-                            name:libname,
-                            content:content.replace(/\r\n?/g,'\n')
+                            name: libname,
+                            content: content.replace(/\r\n?/g, '\n')
                         }
                     };
-                    editor.getSession().$worker.emit('addLibrary', params );
+                    editor.getSession().$worker.emit('addLibrary', params);
                 });
             });
         }, 100);
 
-        $('#javascript-run').click(function(e){
+        $('#javascript-run').click(function (e) {
             javascriptRun();
         });
 
-        $('#select-sample').change(function(e){
+        $('#select-sample').change(function (e) {
             var path = 'samples/' + $(this).val();
             loadFile(path);
         });

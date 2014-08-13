@@ -3,10 +3,12 @@
 /// <amd-dependency path="ace/lib/oop" />
 /// <amd-dependency path="ace/keyboard/hash_handler" />
 define(["require", "exports", "ace/lib/oop", "ace/keyboard/hash_handler"], function(require, exports) {
+    var HashHandler = require('ace/keyboard/hash_handler').HashHandler;
+
     var AutoCompleteHandler = (function () {
         function AutoCompleteHandler(autoComplete) {
             this.autoComplete = autoComplete;
-            AutoCompleteHandler.super_.call(this, {
+            HashHandler.call(this, {
                 focusnext: {
                     bindKey: 'Down|Ctrl-n',
                     exec: function () {
@@ -35,7 +37,7 @@ define(["require", "exports", "ace/lib/oop", "ace/keyboard/hash_handler"], funct
                         }
 
                         var current = autoComplete.view.current;
-                        if (current.length) {
+                        if (current) {
                             editor.insert(current.data('name'));
                         }
 
@@ -45,14 +47,15 @@ define(["require", "exports", "ace/lib/oop", "ace/keyboard/hash_handler"], funct
             });
         }
         AutoCompleteHandler.prototype.attach = function () {
-            this.autoComplete.editor.on('change', this.autoComplete.refreshCompilation);
-            this.autoComplete.active = true;
+            var ac = this.autoComplete;
+            ac.editor.on('change', ac.refreshCompilation);
+            ac.active = true;
         };
 
         AutoCompleteHandler.prototype.detach = function () {
-            this.autoComplete.editor.off('change', this.autoComplete.refreshCompilation);
-            this.autoComplete.view.hide();
-            this.autoComplete.active = false;
+            var ac = this.autoComplete;
+            ac.editor.off('change', ac.refreshCompilation);
+            ac.active = false;
         };
 
         AutoCompleteHandler.prototype.handleKeyboard = function (data, hashId, key, keyCode) {
@@ -76,12 +79,12 @@ define(["require", "exports", "ace/lib/oop", "ace/keyboard/hash_handler"], funct
                 return null;
             }
 
-            if (typeof command != 'string') {
+            if (typeof command !== 'string') {
                 var args = command.args;
                 command = command.command;
             }
 
-            if (typeof command == 'string') {
+            if (typeof command === 'string') {
                 command = this.commands[command];
             }
 
@@ -90,8 +93,9 @@ define(["require", "exports", "ace/lib/oop", "ace/keyboard/hash_handler"], funct
         return AutoCompleteHandler;
     })();
 
-    require('ace/lib/oop').inherits(AutoCompleteHandler, require('ace/keyboard/hash_handler').HashHandler);
+    require('ace/lib/oop').implement(AutoCompleteHandler.prototype, HashHandler.prototype);
 
     
     return AutoCompleteHandler;
 });
+//# sourceMappingURL=AutoCompleteHandler.js.map

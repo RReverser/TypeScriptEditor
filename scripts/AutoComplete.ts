@@ -22,14 +22,6 @@ class AutoComplete {
         this.scriptName = name;
     }
 
-    show() {
-        this.view.show();
-    }
-
-    hide() {
-        this.view.hide();
-    }
-
     compilation(cursor) {
         var compilationInfo = this.compilationService.getCursorCompilation(this.scriptName, cursor);
 
@@ -45,20 +37,18 @@ class AutoComplete {
 
         var compilations = compilationInfo.entries;
 
-        if (this.inputText.length > 0) {
-            compilations = compilationInfo.entries.filter(
-                elm => elm.name.toLowerCase().indexOf(this.inputText.toLowerCase()) == 0
-            );
-        }
-
-        var matchFunc = elm => elm.name.indexOf(this.inputText) == 0 ? 1 : 0;
+        var matchFunc = elm => elm.name.slice(0, text.length) === text ? 1 : 0;
         var matchCompare = (a, b) => matchFunc(b) - matchFunc(a);
-        var textCompare = (a, b) => (a.name == b.name) ? 0 : (a.name > b.name) ? 1 : -1;
+        var textCompare = (a, b) => (a.name === b.name) ? 0 : (a.name > b.name) ? 1 : -1;
         var compare = (a, b) => matchCompare(a, b) || textCompare(a, b);
+
+        if (text.length > 0) {
+            compilations = compilationInfo.entries.filter(elm => elm.name.toLowerCase().slice(0, text.length) === text.toLowerCase());
+        }
 
         compilations = compilations.sort(compare);
 
-        this.showCompilation(compilations);
+        this.view.showCompilation(compilations);
 
         return compilations.length;
     }
@@ -77,15 +67,11 @@ class AutoComplete {
         this.compilation(cursor);
     }
 
-    showCompilation(infos) {
-        this.view.showCompilation(infos);
-    }
-
     activate() {
-        this.show();
+        this.view.show();
         var count = this.compilation(this.editor.getCursorPosition());
-        if (!(count > 0)) {
-            this.hide();
+        if (!count) {
+            this.view.hide();
             return;
         }
         this.editor.keyBinding.addKeyboardHandler(this.handler);
@@ -93,6 +79,7 @@ class AutoComplete {
 
     deactivate() {
         this.editor.keyBinding.removeKeyboardHandler(this.handler);
+        this.view.hide();
     }
 }
 

@@ -28,10 +28,6 @@ define(["require", "exports", "ace/range"], function(require, exports) {
             return this.editor.getSession().getDocument();
         };
 
-        EditorPosition.prototype.getPositionChar = function (cursor) {
-            return this.getDocument().getTextRange(new Range(cursor.row, cursor.column, cursor.row, cursor.column + 1));
-        };
-
         EditorPosition.prototype.getPositionLeftChar = function (cursor) {
             return this.getDocument().getTextRange(new Range(cursor.row, cursor.column, cursor.row, cursor.column - 1));
         };
@@ -43,29 +39,11 @@ define(["require", "exports", "ace/range"], function(require, exports) {
         };
 
         EditorPosition.prototype.getChars = function (pos) {
-            return this.getLinesChars(this.getDocument().getLines(0, pos.row - 1)) + pos.column;
+            return this.getDocument().positionToIndex(pos);
         };
 
         EditorPosition.prototype.getPosition = function (chars) {
-            var doc = this.getDocument();
-            var lines = doc.getAllLines();
-            var count = 0;
-            var row = 0;
-            for (var i in lines) {
-                var line = lines[i];
-                if (chars < (count + (line.length + 1))) {
-                    return {
-                        row: row,
-                        column: chars - count
-                    };
-                }
-                count += line.length + 1;
-                row += 1;
-            }
-            return {
-                row: row,
-                column: chars - count
-            };
+            return this.getDocument().indexToPosition(chars);
         };
         return EditorPosition;
     })();
@@ -73,3 +51,4 @@ define(["require", "exports", "ace/range"], function(require, exports) {
     
     return EditorPosition;
 });
+//# sourceMappingURL=EditorPosition.js.map

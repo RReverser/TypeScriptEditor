@@ -17,16 +17,7 @@ define(["require", "exports", './AutoCompleteHandler', './AutoCompleteView', "ac
             this.scriptName = name;
         };
 
-        AutoComplete.prototype.show = function () {
-            this.view.show();
-        };
-
-        AutoComplete.prototype.hide = function () {
-            this.view.hide();
-        };
-
         AutoComplete.prototype.compilation = function (cursor) {
-            var _this = this;
             var compilationInfo = this.compilationService.getCursorCompilation(this.scriptName, cursor);
 
             if (!compilationInfo) {
@@ -41,28 +32,28 @@ define(["require", "exports", './AutoCompleteHandler', './AutoCompleteView', "ac
 
             var compilations = compilationInfo.entries;
 
-            if (this.inputText.length > 0) {
-                compilations = compilationInfo.entries.filter(function (elm) {
-                    return elm.name.toLowerCase().indexOf(_this.inputText.toLowerCase()) == 0;
-                });
-            }
-
             var matchFunc = function (elm) {
-                return elm.name.indexOf(_this.inputText) == 0 ? 1 : 0;
+                return elm.name.slice(0, text.length) === text ? 1 : 0;
             };
             var matchCompare = function (a, b) {
                 return matchFunc(b) - matchFunc(a);
             };
             var textCompare = function (a, b) {
-                return (a.name == b.name) ? 0 : (a.name > b.name) ? 1 : -1;
+                return (a.name === b.name) ? 0 : (a.name > b.name) ? 1 : -1;
             };
             var compare = function (a, b) {
                 return matchCompare(a, b) || textCompare(a, b);
             };
 
+            if (text.length > 0) {
+                compilations = compilationInfo.entries.filter(function (elm) {
+                    return elm.name.toLowerCase().slice(0, text.length) === text.toLowerCase();
+                });
+            }
+
             compilations = compilations.sort(compare);
 
-            this.showCompilation(compilations);
+            this.view.showCompilation(compilations);
 
             return compilations.length;
         };
@@ -81,15 +72,11 @@ define(["require", "exports", './AutoCompleteHandler', './AutoCompleteView', "ac
             this.compilation(cursor);
         };
 
-        AutoComplete.prototype.showCompilation = function (infos) {
-            this.view.showCompilation(infos);
-        };
-
         AutoComplete.prototype.activate = function () {
-            this.show();
+            this.view.show();
             var count = this.compilation(this.editor.getCursorPosition());
-            if (!(count > 0)) {
-                this.hide();
+            if (!count) {
+                this.view.hide();
                 return;
             }
             this.editor.keyBinding.addKeyboardHandler(this.handler);
@@ -97,6 +84,7 @@ define(["require", "exports", './AutoCompleteHandler', './AutoCompleteView', "ac
 
         AutoComplete.prototype.deactivate = function () {
             this.editor.keyBinding.removeKeyboardHandler(this.handler);
+            this.view.hide();
         };
         return AutoComplete;
     })();
@@ -106,3 +94,4 @@ define(["require", "exports", './AutoCompleteHandler', './AutoCompleteView', "ac
     
     return AutoComplete;
 });
+//# sourceMappingURL=AutoComplete.js.map

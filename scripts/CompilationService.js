@@ -35,13 +35,10 @@ define(["require", "exports", './EditorPosition'], function(require, exports, Ed
 
             return this.getCompilation(script, pos, isMemberCompletion);
         };
-
-        CompilationService.prototype.getCurrentPositionCompilation = function (script) {
-            return this.getCursorCompilation(script, this.editor.getCursorPosition());
-        };
         return CompilationService;
     })();
 
     
     return CompilationService;
 });
+//# sourceMappingURL=CompilationService.js.map

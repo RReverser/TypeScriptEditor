@@ -1,14 +1,14 @@
 /// <reference path="./lib/ace.d.ts" />
 /// <reference path="./lib/jquery.d.ts" />
 
-import AutoComplete = require("./AutoComplete");
+import AutoComplete = require('./AutoComplete');
 
 class AutoCompleteView {
     private selectedClassName = "ace_autocomplete_selected";
-    private wrap = $('<div class="ace_autocomplete_selected" style="display: none; position: fixed; z-index: 1000" />');
-    private listElement = $('<ul style="list-style-type: none" />').appendTo(this.wrap);
-    public current = $();
+    public current: JQuery = null;
     private editor: AceAjax.Editor;
+    private wrap = $('<div class="ace_autocomplete" style="display: none; position: fixed; z-index: 1000" />');
+    private listElement = $('<ul style="list-style-type: none" />').appendTo(this.wrap);
 
     constructor(private autoComplete: AutoComplete) {
         this.editor = autoComplete.editor;
@@ -21,6 +21,7 @@ class AutoCompleteView {
 
     hide(): void {
         this.wrap.hide();
+        this.listElement.empty();
     }
 
     setPosition(coords: any): void {
@@ -36,8 +37,8 @@ class AutoCompleteView {
 
     focus(item: JQuery): void {
         if (item.length) {
-            this.current.removeClass(this.selectedClassName);
-            item.addClass(this.selectedClassName);
+            this.current && this.current.removeClass(this.selectedClassName);
+            this.current = item.addClass(this.selectedClassName);
             this.adjustPosition();
         }
     }
@@ -51,24 +52,24 @@ class AutoCompleteView {
     }
 
     ensureFocus(): void {
-        if (!this.current.length) {
+        if (!this.current) {
             this.focus(this.listElement.children(':first-child'));
         }
     }
 
     adjustPosition() {
-        if (!this.current.length) {
+        if (!this.current) {
             return;
         }
         var wrapHeight = this.wrap.height();
         var elmOuterHeight = this.current.outerHeight();
-        var preMargin = parseInt(this.listElement.css("margin-top").replace('px', ''), 10);
+        var preMargin = parseInt(this.listElement.css('margin-top').replace('px', ''), 10);
         var pos = this.current.position();
         if (pos.top >= (wrapHeight - elmOuterHeight)) {
-            this.listElement.css("margin-top", (preMargin - elmOuterHeight) + 'px');
+            this.listElement.css('margin-top', (preMargin - elmOuterHeight) + 'px');
         }
         if (pos.top < 0) {
-            return this.listElement.css("margin-top", (-pos.top + preMargin) + 'px');
+            return this.listElement.css('margin-top', (-pos.top + preMargin) + 'px');
         }
     }
 
@@ -76,11 +77,12 @@ class AutoCompleteView {
         if (infos.length > 0) {
             this.listElement.html(infos.map(info => {
                 var name = '<span class="label-name">' + info.name + '</span>';
-                var type = info.type ? '<span class="label-type">' + info.type + '</span>' : '';
+                var type = '<span class="label-type">' + info.type + '</span>';
                 var kind = '<span class="label-kind label-kind-' + info.kind + '">' + info.kind.charAt(0) + '</span>';
 
                 return '<li data-name="' + info.name + '">' + kind + name + type + '</li>';
             }).join(''));
+            this.current = null;
 
             this.show();
             this.ensureFocus();

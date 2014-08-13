@@ -439,7 +439,7 @@ declare module AceAjax {
          * @param index An index to convert
          * @param startRow=0 The row from which to start the conversion
         **/
-        indexToPosition(index: number, startRow: number): Position;
+        indexToPosition(index: number, startRow?: number): Position;
 
         /**
          * Converts the `{row, column}` position in a document to the character's index.
@@ -452,7 +452,7 @@ declare module AceAjax {
          * @param pos The `{row, column}` to convert
          * @param startRow=0 The row from which to start the conversion
         **/
-        positionToIndex(pos: Position, startRow: number): number;
+        positionToIndex(pos: Position, startRow?: number): number;
     }
     var Document: {
         /**

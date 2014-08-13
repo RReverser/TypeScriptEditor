@@ -4,10 +4,9 @@
 /// <amd-dependency path="ace/keyboard/hash_handler" />
 
 import AutoComplete = require('./AutoComplete');
+var HashHandler: Function = require('ace/keyboard/hash_handler').HashHandler;
 
 class AutoCompleteHandler implements AceAjax.HashHandler {
-    private static super_: Function;
-
     // AceAjax.HashHandler
     platform: string;
     commands: {[name: string]: AceAjax.EditorCommand};
@@ -22,7 +21,7 @@ class AutoCompleteHandler implements AceAjax.HashHandler {
     findKeyCommand: (hashId: number, key: string) => any;
 
     constructor(private autoComplete: AutoComplete) {
-        AutoCompleteHandler.super_.call(this, {
+        HashHandler.call(this, {
             focusnext: {
                 bindKey: 'Down|Ctrl-n',
                 exec: () => autoComplete.view.focusNext()
@@ -45,7 +44,7 @@ class AutoCompleteHandler implements AceAjax.HashHandler {
                     }
 
                     var current = autoComplete.view.current;
-                    if (current.length) {
+                    if (current) {
                         editor.insert(current.data('name'));
                     }
 
@@ -56,14 +55,15 @@ class AutoCompleteHandler implements AceAjax.HashHandler {
     }
 
     attach() {
-        this.autoComplete.editor.on('change', this.autoComplete.refreshCompilation);
-        this.autoComplete.active = true;
+        var ac = this.autoComplete;
+        ac.editor.on('change', ac.refreshCompilation);
+        ac.active = true;
     }
 
     detach() {
-        this.autoComplete.editor.off('change', this.autoComplete.refreshCompilation);
-        this.autoComplete.view.hide();
-        this.autoComplete.active = false;
+        var ac = this.autoComplete;
+        ac.editor.off('change', ac.refreshCompilation);
+        ac.active = false;
     }
 
     handleKeyboard(data: any, hashId: number, key: string, keyCode: number) {
@@ -87,12 +87,12 @@ class AutoCompleteHandler implements AceAjax.HashHandler {
             return null;
         }
 
-        if (typeof command != 'string') {
+        if (typeof command !== 'string') {
             var args = command.args;
             command = command.command;
         }
 
-        if (typeof command == 'string') {
+        if (typeof command === 'string') {
             command = this.commands[command];
         }
 
@@ -100,6 +100,6 @@ class AutoCompleteHandler implements AceAjax.HashHandler {
     }
 }
 
-require('ace/lib/oop').inherits(AutoCompleteHandler, require('ace/keyboard/hash_handler').HashHandler);
+require('ace/lib/oop').implement(AutoCompleteHandler.prototype, HashHandler.prototype);
 
 export = AutoCompleteHandler;

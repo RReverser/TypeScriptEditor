@@ -39,10 +39,6 @@ class CompilationService {
 
         return this.getCompilation(script, pos, isMemberCompletion);
     }
-
-    getCurrentPositionCompilation(script: string): ts.CompletionInfo {
-        return this.getCursorCompilation(script, this.editor.getCursorPosition());
-    }
 }
 
 export = CompilationService;
