@@ -56,10 +56,10 @@ var Document = function(text) {
 
     // There has to be one line at least in the document. If you pass an empty
     // string to the insert function, nothing will happen. Workaround.
-    if (text.length == 0) {
+    if (text.length === 0) {
         this.$lines = [""];
     } else if (Array.isArray(text)) {
-        this.insertLines(0, text);
+        this._insertLines(0, text);
     } else {
         this.insert({row: 0, column:0}, text);
     }
@@ -81,7 +81,7 @@ var Document = function(text) {
     };
 
     /**
-    * Returns all the lines in the document as a single string, split by the new line character.
+    * Returns all the lines in the document as a single string, joined by the new line character.
     **/
     this.getValue = function() {
         return this.getAllLines().join(this.getNewLineCharacter());
@@ -91,7 +91,6 @@ var Document = function(text) {
     * Creates a new `Anchor` to define a floating point in the document.
     * @param {Number} row The row number to use
     * @param {Number} column The column number to use
-    *
     *
     **/
     this.createAnchor = function(row, column) {
@@ -105,28 +104,23 @@ var Document = function(text) {
     * @param {String} text The text to work with
     * @returns {String} A String array, with each index containing a piece of the original `text` string.
     *
-    *
     **/
 
     // check for IE split bug
-    if ("aaa".split(/a/).length == 0)
+    if ("aaa".split(/a/).length === 0)
         this.$split = function(text) {
             return text.replace(/\r\n|\r/g, "\n").split("\n");
-        }
+        };
     else
         this.$split = function(text) {
             return text.split(/\r\n|\r|\n/);
         };
 
 
- 
     this.$detectNewLine = function(text) {
         var match = text.match(/^.*?(\r\n|\r|\n)/m);
-        if (match) {
-            this.$autoNewLine = match[1];
-        } else {
-            this.$autoNewLine = "\n";
-        }
+        this.$autoNewLine = match ? match[1] : "\n";
+        this._signal("changeNewLineMode");
     };
 
     /**
@@ -134,30 +128,24 @@ var Document = function(text) {
     * @returns {String} If `newLineMode == windows`, `\r\n` is returned.  
     *  If `newLineMode == unix`, `\n` is returned.  
     *  If `newLineMode == auto`, the value of `autoNewLine` is returned.
-    * 
     *
-    * 
-    * 
     **/
     this.getNewLineCharacter = function() {
         switch (this.$newLineMode) {
           case "windows":
             return "\r\n";
-
           case "unix":
             return "\n";
-
           default:
-            return this.$autoNewLine;
+            return this.$autoNewLine || "\n";
         }
     };
 
-    this.$autoNewLine = "\n";
+    this.$autoNewLine = "";
     this.$newLineMode = "auto";
     /**
      * [Sets the new line mode.]{: #Document.setNewLineMode.desc}
      * @param {String} newLineMode [The newline mode to use; can be either `windows`, `unix`, or `auto`]{: #Document.setNewLineMode.param}
-     * 
      *
      **/
     this.setNewLineMode = function(newLineMode) {
@@ -165,6 +153,7 @@ var Document = function(text) {
             return;
 
         this.$newLineMode = newLineMode;
+        this._signal("changeNewLineMode");
     };
 
     /**
@@ -179,8 +168,6 @@ var Document = function(text) {
     * Returns `true` if `text` is a newline character (either `\r\n`, `\r`, or `\n`).
     * @param {String} text The text to check
     *
-    * 
-    *
     **/
     this.isNewLine = function(text) {
         return (text == "\r\n" || text == "\r" || text == "\n");
@@ -189,8 +176,6 @@ var Document = function(text) {
     /**
     * Returns a verbatim copy of the given line as it is in the document
     * @param {Number} row The row index to retrieve
-    *
-    * 
     *
     **/
     this.getLine = function(row) {
@@ -202,15 +187,13 @@ var Document = function(text) {
     * @param {Number} firstRow The first row index to retrieve
     * @param {Number} lastRow The final row index to retrieve
     *
-    * 
-    *
     **/
     this.getLines = function(firstRow, lastRow) {
         return this.$lines.slice(firstRow, lastRow + 1);
     };
 
     /**
-    * Returns all lines in the document as string array. Warning: The caller should not modify this array!
+    * Returns all lines in the document as string array.
     **/
     this.getAllLines = function() {
         return this.getLines(0, this.getLength());
@@ -231,15 +214,15 @@ var Document = function(text) {
     **/
     this.getTextRange = function(range) {
         if (range.start.row == range.end.row) {
-            return this.$lines[range.start.row].substring(range.start.column,
-                                                         range.end.column);
+            return this.getLine(range.start.row)
+                .substring(range.start.column, range.end.column);
         }
-        else {
-            var lines = this.getLines(range.start.row+1, range.end.row-1);
-            lines.unshift((this.$lines[range.start.row] || "").substring(range.start.column));
-            lines.push((this.$lines[range.end.row] || "").substring(0, range.end.column));
-            return lines.join(this.getNewLineCharacter());
-        }
+        var lines = this.getLines(range.start.row, range.end.row);
+        lines[0] = (lines[0] || "").substring(range.start.column);
+        var l = lines.length - 1;
+        if (range.end.row - range.start.row == l)
+            lines[l] = lines[l].substring(0, range.end.column);
+        return lines.join(this.getNewLineCharacter());
     };
 
     this.$clipPosition = function(position) {
@@ -276,7 +259,7 @@ var Document = function(text) {
         position = this.insertInLine(position, firstLine);
         if (lastLine !== null) {
             position = this.insertNewLine(position); // terminate first line
-            position = this.insertLines(position.row, lines);
+            position = this._insertLines(position.row, lines);
             position = this.insertInLine(position, lastLine || "");
         }
         return position;
@@ -318,19 +301,22 @@ var Document = function(text) {
     *   {row: row, column: 0}
     *   ```
     *
-    * 
-    *
-    *
     **/
     this.insertLines = function(row, lines) {
+        if (row >= this.getLength())
+            return this.insert({row: row, column: 0}, "\n" + lines.join("\n"));
+        return this._insertLines(Math.max(row, 0), lines);
+    };
+    this._insertLines = function(row, lines) {
         if (lines.length == 0)
             return {row: row, column: 0};
 
         // apply doesn't work for big arrays (smallest threshold is on safari 0xFFFF)
         // to circumvent that we have to break huge inserts into smaller chunks here
-        if (lines.length > 0xFFFF) {
-            var end = this.insertLines(row, lines.slice(0xFFFF));
-            lines = lines.slice(0, 0xFFFF);
+        while (lines.length > 0xF000) {
+            var end = this._insertLines(row, lines.slice(0, 0xF000));
+            lines = lines.slice(0xF000);
+            row = end.row;
         }
 
         var args = [row, 0];
@@ -343,8 +329,8 @@ var Document = function(text) {
             range: range,
             lines: lines
         };
-        this._emit("change", { data: delta });
-        return end || range.end;
+        this._signal("change", { data: delta });
+        return range.end;
     };
 
     /**
@@ -373,7 +359,7 @@ var Document = function(text) {
             range: Range.fromPoints(position, end),
             text: this.getNewLineCharacter()
         };
-        this._emit("change", { data: delta });
+        this._signal("change", { data: delta });
 
         return end;
     };
@@ -407,7 +393,7 @@ var Document = function(text) {
             range: Range.fromPoints(position, end),
             text: text
         };
-        this._emit("change", { data: delta });
+        this._signal("change", { data: delta });
 
         return end;
     };
@@ -417,9 +403,10 @@ var Document = function(text) {
     * @param {Range} range A specified Range to remove
     * @returns {Object} Returns the new `start` property of the range, which contains `startRow` and `startColumn`. If `range` is empty, this function returns the unmodified value of `range.start`.
     *
-    *
     **/
     this.remove = function(range) {
+        if (!(range instanceof Range))
+            range = Range.fromPoints(range.start, range.end);
         // clip to document
         range.start = this.$clipPosition(range.start);
         range.end = this.$clipPosition(range.end);
@@ -438,7 +425,7 @@ var Document = function(text) {
                 this.removeInLine(lastRow, 0, range.end.column);
 
             if (lastFullRow >= firstFullRow)
-                this.removeLines(firstFullRow, lastFullRow);
+                this._removeLines(firstFullRow, lastFullRow);
 
             if (firstFullRow != firstRow) {
                 this.removeInLine(firstRow, range.start.column, this.getLine(firstRow).length);
@@ -458,7 +445,6 @@ var Document = function(text) {
     * @param {Number} endColumn The column to stop removing at
     * @returns {Object} Returns an object containing `startRow` and `startColumn`, indicating the new row and column values.<br/>If `startColumn` is equal to `endColumn`, this function returns nothing.
     *
-    * 
     **/
     this.removeInLine = function(row, startColumn, endColumn) {
         if (startColumn == endColumn)
@@ -475,7 +461,7 @@ var Document = function(text) {
             range: range,
             text: removed
         };
-        this._emit("change", { data: delta });
+        this._signal("change", { data: delta });
         return range.start;
     };
 
@@ -484,10 +470,15 @@ var Document = function(text) {
     * @param {Number} firstRow The first row to be removed
     * @param {Number} lastRow The last row to be removed
     * @returns {[String]} Returns all the removed lines.
-    * 
     *
     **/
     this.removeLines = function(firstRow, lastRow) {
+        if (firstRow < 0 || lastRow >= this.getLength())
+            return this.remove(new Range(firstRow, 0, lastRow + 1, 0));
+        return this._removeLines(firstRow, lastRow);
+    };
+
+    this._removeLines = function(firstRow, lastRow) {
         var range = new Range(firstRow, 0, lastRow + 1, 0);
         var removed = this.$lines.splice(firstRow, lastRow - firstRow + 1);
 
@@ -497,7 +488,7 @@ var Document = function(text) {
             nl: this.getNewLineCharacter(),
             lines: removed
         };
-        this._emit("change", { data: delta });
+        this._signal("change", { data: delta });
         return removed;
     };
 
@@ -520,7 +511,7 @@ var Document = function(text) {
             range: range,
             text: this.getNewLineCharacter()
         };
-        this._emit("change", { data: delta });
+        this._signal("change", { data: delta });
     };
 
     /**
@@ -532,9 +523,10 @@ var Document = function(text) {
     * If the text and range are empty, this function returns an object containing the current `range.start` value.
     * If the text is the exact same as what currently exists, this function returns an object containing the current `range.end` value.
     *
-    *
     **/
     this.replace = function(range, text) {
+        if (!(range instanceof Range))
+            range = Range.fromPoints(range.start, range.end);
         if (text.length == 0 && range.isEmpty())
             return range.start;
 
@@ -567,7 +559,7 @@ var Document = function(text) {
             else if (delta.action == "insertText")
                 this.insert(range.start, delta.text);
             else if (delta.action == "removeLines")
-                this.removeLines(range.start.row, range.end.row - 1);
+                this._removeLines(range.start.row, range.end.row - 1);
             else if (delta.action == "removeText")
                 this.remove(range);
         }
@@ -583,11 +575,11 @@ var Document = function(text) {
             var range = Range.fromPoints(delta.range.start, delta.range.end);
 
             if (delta.action == "insertLines")
-                this.removeLines(range.start.row, range.end.row - 1);
+                this._removeLines(range.start.row, range.end.row - 1);
             else if (delta.action == "insertText")
                 this.remove(range);
             else if (delta.action == "removeLines")
-                this.insertLines(range.start.row, delta.lines);
+                this._insertLines(range.start.row, delta.lines);
             else if (delta.action == "removeText")
                 this.insert(range.start, delta.text);
         }
@@ -642,9 +634,9 @@ var Document = function(text) {
         var index = 0;
         var row = Math.min(pos.row, lines.length);
         for (var i = startRow || 0; i < row; ++i)
-            index += lines[i].length;
+            index += lines[i].length + newlineLength;
 
-        return index + newlineLength * i + pos.column;
+        return index + pos.column;
     };
 
 }).call(Document.prototype);
