@@ -1,39 +1,48 @@
-import EditorPositionModule = module('./EditorPosition');
+/// <reference path="./lib/ace.d.ts" />
+/// <reference path="./lib/ace/mode/typescript/typescriptServices.d.ts" />
 
-export class CompilationService{
+import EditorPosition = require('./EditorPosition');
 
-    public editorPos;// The ace control
-    public matchText;
+class CompilationService {
+    private editorPos: EditorPosition;// The ace control
+    public matchText: string;
 
-    constructor(public editor,public ServiceShim){
-        this.editorPos = new EditorPositionModule.EditorPosition(editor);
+    constructor(private editor: AceAjax.Editor, private serviceShim: ts.LanguageServiceShim) {
+        this.editorPos = new EditorPosition(editor);
     }
 
-    getCompilation (script, charpos, isMemberCompletion) {
-        var compInfo;
-        compInfo = this.ServiceShim.languageService.getCompletionsAtPosition(script, charpos, isMemberCompletion);
+    getCompilation(script: string, charpos: number, isMemberCompletion: boolean): ts.CompletionInfo {
+        var compInfo = this.serviceShim.languageService.getCompletionsAtPosition(script, charpos, isMemberCompletion);
+        if (compInfo) {
+            compInfo.entries = compInfo.entries.map(
+                compInfo => this.serviceShim.languageService.getCompletionEntryDetails(script, charpos, compInfo.name),
+                this
+            );
+        }
         return compInfo;
-    };
+    }
 
-    getCursorCompilation(script, cursor) {
-        var isMemberCompletion, matches, pos, text;
-        pos = this.editorPos.getPositionChars(cursor);
-        text = this.editor.session.getLine(cursor.row).slice(0, cursor.column);
-        isMemberCompletion = false;
-        matches = text.match(/\.([a-zA-Z_0-9\$]*$)/);
+    getCursorCompilation(script: string, cursor: AceAjax.Position): ts.CompletionInfo {
+        var pos = this.editorPos.getPositionChars(cursor);
+        var text = this.editor.session.getLine(cursor.row).slice(0, cursor.column);
+        var isMemberCompletion = false;
+        var matches = text.match(/\.([a-zA-Z_0-9\$]*$)/);
 
-        if (matches && matches.length > 0) {
-             this.matchText = matches[1];
+        if (matches) {
+            this.matchText = matches[1];
             isMemberCompletion = true;
             pos -= this.matchText.length;
         } else {
             matches = text.match(/[a-zA-Z_0-9\$]*$/);
             this.matchText = matches[0];
         }
-        return this.getCompilation(script, pos, isMemberCompletion);
-    };
 
-    getCurrentPositionCompilation (script) {
+        return this.getCompilation(script, pos, isMemberCompletion);
+    }
+
+    getCurrentPositionCompilation(script: string): ts.CompletionInfo {
         return this.getCursorCompilation(script, this.editor.getCursorPosition());
-    };
+    }
 }
+
+export = CompilationService;

@@ -1,72 +1,59 @@
-define(["require", "exports"], function(require, exports) {
+/// <reference path="./lib/require.d.ts" />
+/// <reference path="./lib/ace.d.ts" />
+/// <amd-dependency path="ace/range" />
+define(["require", "exports", "ace/range"], function(require, exports) {
+    var Range = require('ace/range');
+
     var EditorPosition = (function () {
         function EditorPosition(editor) {
             this.editor = editor;
-            var _this = this;
-            this.getPositionChars = function (pos) {
-                var doc;
-                doc = editor.getSession().getDocument();
-                return _this.getChars(doc, pos);
-            };
-            this.getAcePositionFromChars = function (chars) {
-                var doc;
-                doc = editor.getSession().getDocument();
-                return _this.getPosition(doc, chars);
-            };
-            this.getCurrentCharPosition = function () {
-                return _this.getPositionChars(editor.getCursorPosition());
-            };
-            this.getCurrentLeftChar = function () {
-                return _this.getPositionLeftChar(editor.getCursorPosition());
-            };
-            this.getPositionChar = function (cursor) {
-                var range;
-                range = {
-                    start: {
-                        row: cursor.row,
-                        column: cursor.column
-                    },
-                    end: {
-                        row: cursor.row,
-                        column: cursor.column + 1
-                    }
-                };
-                return editor.getSession().getDocument().getTextRange(range);
-            };
-            this.getPositionLeftChar = function (cursor) {
-                var range;
-                range = {
-                    start: {
-                        row: cursor.row,
-                        column: cursor.column
-                    },
-                    end: {
-                        row: cursor.row,
-                        column: cursor.column - 1
-                    }
-                };
-                return editor.getSession().getDocument().getTextRange(range);
-            };
         }
+        EditorPosition.prototype.getPositionChars = function (pos) {
+            return this.getChars(pos);
+        };
+
+        EditorPosition.prototype.getAcePositionFromChars = function (chars) {
+            return this.getPosition(chars);
+        };
+
+        EditorPosition.prototype.getCurrentCharPosition = function () {
+            return this.getPositionChars(this.editor.getCursorPosition());
+        };
+
+        EditorPosition.prototype.getCurrentLeftChar = function () {
+            return this.getPositionLeftChar(this.editor.getCursorPosition());
+        };
+
+        EditorPosition.prototype.getDocument = function () {
+            return this.editor.getSession().getDocument();
+        };
+
+        EditorPosition.prototype.getPositionChar = function (cursor) {
+            return this.getDocument().getTextRange(new Range(cursor.row, cursor.column, cursor.row, cursor.column + 1));
+        };
+
+        EditorPosition.prototype.getPositionLeftChar = function (cursor) {
+            return this.getDocument().getTextRange(new Range(cursor.row, cursor.column, cursor.row, cursor.column - 1));
+        };
+
         EditorPosition.prototype.getLinesChars = function (lines) {
-            var count, _this = this;
-            count = 0;
-            lines.forEach(function (line) {
-                return count += line.length + 1;
-            });
-            return count;
+            return lines.reduce(function (count, line) {
+                return count + line.length + 1;
+            }, 0);
         };
-        EditorPosition.prototype.getChars = function (doc, pos) {
-            return this.getLinesChars(doc.getLines(0, pos.row - 1)) + pos.column;
+
+        EditorPosition.prototype.getChars = function (pos) {
+            return this.getLinesChars(this.getDocument().getLines(0, pos.row - 1)) + pos.column;
         };
-        EditorPosition.prototype.getPosition = function (doc, chars) {
-            var count, i, line, lines, row;
-            lines = doc.getAllLines();
-            count = 0;
-            row = 0;
-            for(i in lines) {
-                line = lines[i];
-                if(chars < (count + (line.length + 1))) {
+
+        EditorPosition.prototype.getPosition = function (chars) {
+            var doc = this.getDocument();
+            var lines = doc.getAllLines();
+            var count = 0;
+            var row = 0;
+            for (var i in lines) {
+                var line = lines[i];
+                if (chars < (count + (line.length + 1))) {
                     return {
                         row: row,
                         column: chars - count
@@ -82,5 +69,7 @@ define(["require", "exports"], function(require, exports) {
         };
         return EditorPosition;
     })();
-    exports.EditorPosition = EditorPosition;    
-})
+
+    
+    return EditorPosition;
+});

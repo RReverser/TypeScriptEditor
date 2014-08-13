@@ -12,90 +12,113 @@ declare module AceAjax {
         lines: string[];
     }
 
+    export interface EventEmitter {
+        _dispatchEvent(eventName: string, data?: any): any;
+        _emit(eventName: string, data?: any): any;
+        _signal(eventName: string, data?: any): any;
+
+        setDefaultHandler(eventName: string, callback: (data: any, sender: EventEmitter) => any): void;
+        removeDefaultHandler(eventName: string, callback: (data: any, sender: EventEmitter) => any): void;
+
+        addEventListener(eventName: string, callback: (data: any, sender: EventEmitter) => any, capturing?: boolean): (data: any, sender: EventEmitter) => any;
+        removeEventListener(eventName: string, callback: (data: any, sender: EventEmitter) => any): void;
+        removeListener(eventName: string, callback: (data: any, sender: EventEmitter) => any): void;
+
+        on(eventName: string, callback: (data: any, sender: EventEmitter) => any, capturing?: boolean): (data: any, sender: EventEmitter) => any;
+        once(eventName: string, callback: (data: any, sender: EventEmitter) => any): void;
+        off(eventName: string, callback: (data: any, sender: EventEmitter) => any): void;
+
+        removeAllListeners(eventName: string): void;
+    }
+    var EventEmitter: {
+        new(): EventEmitter
+    };
+
     export interface EditorCommand {
-
-        name:string;
-
-        bindKey:any;
-
-        exec:Function;
+        name?: string;
+        bindKey?: string;
+        exec: Function;
     }
 
-    export interface CommandManager {
-
-        byName;
-
-        commands;
-
+    export interface HashHandler {
         platform: string;
 
-        addCommands(commands:EditorCommand[]);
+        commands: {[name: string]: EditorCommand};
+        commandKeyBinding: {[hashId: number]: {[key: string]: any}};
 
-        addCommand(command:EditorCommand);
+        addCommand(command: EditorCommand): void;
+        removeCommand(command: EditorCommand): void;
+        removeCommand(commandName: string): void;
 
-        exec(name: string, editor: Editor, args: any);
+        bindKey(key: string, command: string): void;
+        bindKey(key: string, command: Function): void;
+        bindKey(key: string, command: EditorCommand): void;
+
+        addCommands(commands?: {[name: string]: any}): void;
+        removeCommands(commands?: {[name: string]: any}): void;
+
+        bindKeys(keyList: {[key: string]: any}): void;
+
+        parseKeys(keys: string): {key: string; hashId: number};
+        findKeyCommand(hashId: number, key: string): any;
+        handleKeyboard(data: any, hashId: number, key: string, keyCode: number): {command: any; args?: any; passEvent?: boolean};
     }
+    var HashHandler: {
+        new(commands?: {[name: string]: any}, platform?: string): HashHandler;
+    };
+
+    export interface Macro extends Array<Array<any>> { }
+
+    export interface CommandManager extends HashHandler {
+        byName: {[name: string]: EditorCommand};
+        exec(commandName: string, editor: Editor, args?: any);
+
+        toggleRecording(editor: Editor): boolean;
+        replay(editor: Editor): void;
+        trimMacro(macro: Macro): Macro;
+    }
+    var CommandManager: {
+        new(platform?: string, commands?: {[name: string]: any}): HashHandler;
+    };
 
     export interface Annotation {
-
          row: number;
-
          column: number;
-
          text: string;
-
          type: string;
     }
 
     export interface TokenInfo {
-
         value: string;
     }
 
     export interface Position {
-
         row: number;
-
         column: number;
     }
 
     export interface KeyBinding {
-
-        setDefaultHandler(kb);
-
-        setKeyboardHandler(kb);
-
-        addKeyboardHandler(kb, pos);
-
-        removeKeyboardHandler(kb): boolean;
-
+        setDefaultHandler(kb: any): void;
+        setKeyboardHandler(kb: any): void;
+        addKeyboardHandler(kb: any, pos?: number): void;
+        removeKeyboardHandler(kb: any): boolean;
         getKeyboardHandler(): any;
-
-        onCommandKey(e, hashId, keyCode);
-
-        onTextInput(text);
+        onCommandKey(data: any, hashId: number, keyCode: number): void;
+        onTextInput(text: string): void;
     }
     var KeyBinding: {
         new(editor: Editor): KeyBinding;
     }
 
     export interface TextMode {
-
         getTokenizer(): any;
-
-        toggleCommentLines(state, doc, startRow, endRow);
-
+        toggleCommentLines(state: any, doc: Document, startRow: number, endRow: number);
         getNextLineIndent (state, line, tab): string;
-
         checkOutdent(state, line, input): boolean;
-
-        autoOutdent(state, doc, row);
-
-        createWorker(session): any;
-
-        createModeDelegates (mapping);
-
-        transformAction(state, action, editor, session, param): any;
+        autoOutdent(state, doc: Document, row: number);
+        createWorker(session: IEditSession): any;
+        createModeDelegates(mapping);
+        transformAction(state, action, editor: Editor, session: IEditSession, param): any;
     }
 
     ////////////////
@@ -147,9 +170,7 @@ declare module AceAjax {
     /**
      * Defines the floating pointer in the document. Whenever text is inserted or deleted before the cursor, the position of the cursor is updated.
     **/
-    export interface Anchor {
-
-        on(event: string, fn: (e) => any);
+    export interface Anchor extends EventEmitter {
 
         /**
          * Returns an object identifying the `row` and `column` position of the current anchor.
@@ -202,7 +223,7 @@ declare module AceAjax {
      * Tokenizes the current [[Document `Document`]] in the background, and caches the tokenized rows for future use.
      * If a certain row is changed, everything below that row is re-tokenized.
     **/
-    export interface BackgroundTokenizer {
+    export interface BackgroundTokenizer extends EventEmitter {
 
         states: any[];
 
@@ -265,9 +286,7 @@ declare module AceAjax {
      * Contains the text of the document. Document can be attached to several [[EditSession `EditSession`]]s.
      * At its core, `Document`s are just an array of strings, with each row in the document matching up to the array index.
     **/
-    export interface Document {
-
-        on(event: string, fn: (e) => any);
+    export interface Document extends EventEmitter {
 
         /**
          * Replaces all the lines in the current `Document` with the value of `text`.
@@ -456,15 +475,13 @@ declare module AceAjax {
      * Stores all the data about [[Editor `Editor`]] state providing easy way to change editors state.
      * `EditSession` can be attached to only one [[Document `Document`]]. Same `Document` can be attached to several `EditSession`s.
     **/
-    export interface IEditSession {
+    export interface IEditSession extends EventEmitter {
 
         selection: Selection;
 
         bgTokenizer: BackgroundTokenizer;
 
         doc: Document;
-
-        on(event: string, fn: (e) => any);
 
         findMatchingBracket(position: Position);
 
@@ -1033,7 +1050,7 @@ declare module AceAjax {
      * The `Editor` manages the [[EditSession]] (which manages [[Document]]s), as well as the [[VirtualRenderer]], which draws everything to the screen.
      * Event sessions dealing with the mouse and keyboard are bubbled up from `Document` to the `Editor`, which decides what to do with them.
     **/
-    export interface Editor {
+    export interface Editor extends EventEmitter {
 
         inMultiSelectMode: boolean;
 
@@ -1715,9 +1732,7 @@ declare module AceAjax {
     /// PlaceHolder
     ////////////////////////////////
 
-    export interface PlaceHolder {
-
-        on(event: string, fn: (e) => any);
+    export interface PlaceHolder extends EventEmitter {
 
         /**
          * PlaceHolder.setup()
@@ -2016,7 +2031,7 @@ declare module AceAjax {
     /**
      * A set of methods for setting and retrieving the editor's scrollbar.
     **/
-    export interface ScrollBar {
+    export interface ScrollBar extends EventEmitter {
 
         /**
          * Emitted when the scroll bar, well, scrolls.
@@ -2126,9 +2141,7 @@ declare module AceAjax {
      * Contains the cursor position and the text selection of an edit session.
      * The row/columns used in the selection are in document coordinates representing ths coordinates as thez appear in the document before applying soft wrap and folding.
     **/
-    export interface Selection {
-
-        addEventListener(ev: string, callback: Function);
+    export interface Selection extends EventEmitter {
 
         moveCursorWordLeft();
 
@@ -2139,8 +2152,6 @@ declare module AceAjax {
         setSelectionRange(match);
 
         getAllRanges(): Range[];
-
-        on(event: string, fn: (e) => any);
 
         addRange(range: Range);
 

@@ -1,87 +1,62 @@
-export class EditorPosition{
+/// <reference path="./lib/require.d.ts" />
+/// <reference path="./lib/ace.d.ts" />
+/// <amd-dependency path="ace/range" />
 
-    public getPositionChars:Function;
-    public getAcePositionFromChars:Function;
-    public getCurrentCharPosition :Function;
-    public getCurrentLeftChar:Function;
-    public getPositionChar:Function;
-    public getPositionLeftChar:Function;
+var Range: typeof AceAjax.Range = require('ace/range');
 
-    constructor(public editor)    {
-
-        this.getPositionChars=(pos)=> {
-            var doc;
-            doc = editor.getSession().getDocument();
-            return this.getChars(doc, pos);
-        };
-
-        this.getAcePositionFromChars= (chars)=> {
-            var doc;
-            doc = editor.getSession().getDocument();
-            return this.getPosition(doc, chars);
-        };
-
-        this.getCurrentCharPosition = () => {
-            return this.getPositionChars(editor.getCursorPosition());
-        };
-
-        this.getCurrentLeftChar = () => {
-            return this.getPositionLeftChar(editor.getCursorPosition());
-        };
-
-        this.getPositionChar = (cursor) => {
-            var range;
-            range = {
-                start: {
-                    row: cursor.row,
-                    column: cursor.column
-                },
-                end: {
-                    row: cursor.row,
-                    column: cursor.column + 1
-                }
-            };
-            return editor.getSession().getDocument().getTextRange(range);
-        };
-
-        this.getPositionLeftChar = (cursor) => {
-            var range;
-            range = {
-                start: {
-                    row: cursor.row,
-                    column: cursor.column
-                },
-                end: {
-                    row: cursor.row,
-                    column: cursor.column - 1
-                }
-            };
-            return editor.getSession().getDocument().getTextRange(range);
-        };
-
+class EditorPosition {
+    constructor(private editor:AceAjax.Editor) {
     }
 
-    getLinesChars(lines){
-        var count,
-            _this = this;
-        count = 0;
-        lines.forEach(function(line) {
-            return count += line.length + 1;
-        });
-        return count;
+    getPositionChars(pos: AceAjax.Position): number {
+        return this.getChars(pos);
     }
 
-    getChars(doc,pos){
-        return this.getLinesChars(doc.getLines(0, pos.row - 1)) + pos.column;
+    getAcePositionFromChars(chars: number): AceAjax.Position {
+        return this.getPosition(chars);
     }
 
-    getPosition(doc,chars){
-        var count, i, line, lines, row;
-        lines = doc.getAllLines();
-        count = 0;
-        row = 0;
-        for (i in lines) {
-            line = lines[i];
+    getCurrentCharPosition(): number {
+        return this.getPositionChars(this.editor.getCursorPosition());
+    }
+
+    getCurrentLeftChar(): string {
+        return this.getPositionLeftChar(this.editor.getCursorPosition());
+    }
+
+    getDocument(): AceAjax.Document {
+        return this.editor.getSession().getDocument();
+    }
+
+    getPositionChar(cursor: AceAjax.Position): string {
+        return this.getDocument().getTextRange(new Range(
+            cursor.row, cursor.column,
+            cursor.row, cursor.column + 1
+        ));
+    }
+
+    getPositionLeftChar(cursor: AceAjax.Position): string {
+        return this.getDocument().getTextRange(new Range(
+            cursor.row, cursor.column,
+            cursor.row, cursor.column - 1
+        ));
+    }
+
+    getLinesChars(lines: string[]): number {
+        return lines.reduce((count:number, line:string) => count + line.length + 1, 0);
+    }
+
+    getChars(pos: AceAjax.Position): number {
+        return this.getLinesChars(this.getDocument().getLines(0, pos.row - 1)) + pos.column;
+    }
+
+    getPosition(chars: number): AceAjax.Position {
+        var doc = this.getDocument();
+        var lines = doc.getAllLines();
+        var count = 0;
+        var row = 0;
+        for (var i in lines) {
+            var line = lines[i];
             if (chars < (count + (line.length + 1))) {
                 return {
                     row: row,
@@ -97,3 +72,5 @@ export class EditorPosition{
         };
     }
 }
+
+export = EditorPosition;

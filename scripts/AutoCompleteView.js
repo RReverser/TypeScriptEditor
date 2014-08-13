@@ -1,96 +1,92 @@
+/// <reference path="./lib/ace.d.ts" />
+/// <reference path="./lib/jquery.d.ts" />
 define(["require", "exports"], function(require, exports) {
     var AutoCompleteView = (function () {
-        function AutoCompleteView(editor, autoComplete) {
-            this.editor = editor;
+        function AutoCompleteView(autoComplete) {
             this.autoComplete = autoComplete;
-            this.selectedClassName = 'ace_autocomplete_selected';
-            this.wrap = document.createElement('div');
-            this.listElement = document.createElement('ul');
-            this.wrap.className = 'ace_autocomplete';
-            this.wrap.style.display = 'none';
-            this.listElement.style.listStyleType = 'none';
-            this.wrap.style.position = 'fixed';
-            this.wrap.style.zIndex = '1000';
-            this.wrap.appendChild(this.listElement);
+            this.selectedClassName = "ace_autocomplete_selected";
+            this.wrap = $('<div class="ace_autocomplete_selected" style="display: none; position: fixed; z-index: 1000" />');
+            this.listElement = $('<ul style="list-style-type: none" />').appendTo(this.wrap);
+            this.current = $();
+            this.editor = autoComplete.editor;
+            this.wrap.appendTo(this.editor.container);
         }
         AutoCompleteView.prototype.show = function () {
-            return this.wrap.style.display = 'block';
+            this.wrap.show();
         };
+
         AutoCompleteView.prototype.hide = function () {
-            return this.wrap.style.display = 'none';
+            this.wrap.hide();
         };
+
         AutoCompleteView.prototype.setPosition = function (coords) {
-            var bottom, editorBottom, top;
-            top = coords.pageY + 20;
-            editorBottom = $(this.editor.container).offset().top + $(this.editor.container).height();
-            bottom = top + $(this.wrap).height();
-            if(bottom < editorBottom) {
-                this.wrap.style.top = top + 'px';
-                return this.wrap.style.left = coords.pageX + 'px';
-            } else {
-                this.wrap.style.top = (top - $(this.wrap).height() - 20) + 'px';
-                return this.wrap.style.left = coords.pageX + 'px';
+            var top = coords.pageY + 20;
+            var $container = $(this.editor.container);
+            var bottom = top + this.wrap.height();
+            var editorBottom = $container.offset().top + $container.height();
+            this.wrap.css({
+                top: (bottom < editorBottom ? top : (top - this.wrap.height() - 20)) + 'px',
+                left: coords.pageX + 'px'
+            });
+        };
+
+        AutoCompleteView.prototype.focus = function (item) {
+            if (item.length) {
+                this.current.removeClass(this.selectedClassName);
+                item.addClass(this.selectedClassName);
+                this.adjustPosition();
             }
         };
-        AutoCompleteView.prototype.current = function () {
-            var child, children, i;
-            children = this.listElement.childNodes;
-            for(i in children) {
-                child = children[i];
-                if(child.className === this.selectedClassName) {
-                    return child;
-                }
-            }
-            return null;
-        };
+
         AutoCompleteView.prototype.focusNext = function () {
-            var curr, focus;
-            curr = this.current();
-            focus = curr.nextSibling;
-            if(focus) {
-                curr.className = '';
-                focus.className = this.selectedClassName;
-                return this.adjustPosition();
-            }
+            this.focus(this.current.next());
         };
+
         AutoCompleteView.prototype.focusPrev = function () {
-            var curr, focus;
-            curr = this.current();
-            focus = curr.previousSibling;
-            if(focus) {
-                curr.className = '';
-                focus.className = this.selectedClassName;
-                return this.adjustPosition();
-            }
+            this.focus(this.current.prev());
         };
+
         AutoCompleteView.prototype.ensureFocus = function () {
-            if(!this.current()) {
-                if(this.listElement.firstChild) {
-                    this.listElement.firstChild.className = this.selectedClassName;
-                    return this.adjustPosition();
-                }
+            if (!this.current.length) {
+                this.focus(this.listElement.children(':first-child'));
             }
         };
+
         AutoCompleteView.prototype.adjustPosition = function () {
-            var elm, elmOuterHeight, newMargin, pos, preMargin, wrapHeight;
-            elm = this.current();
-            if(elm) {
-                newMargin = '';
-                wrapHeight = $(this.wrap).height();
-                elmOuterHeight = $(elm).outerHeight();
-                preMargin = parseInt($(this.listElement).css("margin-top").replace('px', ''), 10);
-                pos = $(elm).position();
-                if(pos.top >= (wrapHeight - elmOuterHeight)) {
-                    newMargin = (preMargin - elmOuterHeight) + 'px';
-                    $(this.listElement).css("margin-top", newMargin);
-                }
-                if(pos.top < 0) {
-                    newMargin = (-pos.top + preMargin) + 'px';
-                    return $(this.listElement).css("margin-top", newMargin);
-                }
+            if (!this.current.length) {
+                return;
+            }
+            var wrapHeight = this.wrap.height();
+            var elmOuterHeight = this.current.outerHeight();
+            var preMargin = parseInt(this.listElement.css("margin-top").replace('px', ''), 10);
+            var pos = this.current.position();
+            if (pos.top >= (wrapHeight - elmOuterHeight)) {
+                this.listElement.css("margin-top", (preMargin - elmOuterHeight) + 'px');
+            }
+            if (pos.top < 0) {
+                return this.listElement.css("margin-top", (-pos.top + preMargin) + 'px');
+            }
+        };
+
+        AutoCompleteView.prototype.showCompilation = function (infos) {
+            if (infos.length > 0) {
+                this.listElement.html(infos.map(function (info) {
+                    var name = '<span class="label-name">' + info.name + '</span>';
+                    var type = info.type ? '<span class="label-type">' + info.type + '</span>' : '';
+                    var kind = '<span class="label-kind label-kind-' + info.kind + '">' + info.kind.charAt(0) + '</span>';
+
+                    return '<li data-name="' + info.name + '">' + kind + name + type + '</li>';
+                }).join(''));
+
+                this.show();
+                this.ensureFocus();
+            } else {
+                this.hide();
             }
         };
         return AutoCompleteView;
     })();
-    exports.AutoCompleteView = AutoCompleteView;    
-})
+
+    
+    return AutoCompleteView;
+});

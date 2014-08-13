@@ -1,121 +1,153 @@
-/// This is an extract of harness.js .
-///   Just the ScriptInfo and the
-///  TypeScriptLS classes.
-/// Notice the manual require calls for ./typescriptServices.
-define(function(require, exports, module) {
-
-    var __extends = this.__extends || function (d, b) {
-        function __() {
-            this.constructor = d;
-        }
-        __.prototype = b.prototype;
-        d.prototype = new __();
-    };
-
-    var Services = require('./typescriptServices').Services;
-    var TypeScript = require('./typescriptServices').TypeScript;
+/// <reference path="./typescriptServices.d.ts" />
+define(["require", "exports"], function(require, exports) {
+    
 
     var ScriptInfo = (function () {
-        function ScriptInfo(name, content, isResident, maxScriptVersions) {
-            this.name = name;
+        function ScriptInfo(fileName, content, isOpen) {
+            if (typeof isOpen === "undefined") { isOpen = true; }
+            this.fileName = fileName;
             this.content = content;
-            this.isResident = isResident;
-            this.maxScriptVersions = maxScriptVersions;
-            this.editRanges = [];
+            this.isOpen = isOpen;
             this.version = 1;
-        }
-        ScriptInfo.prototype.updateContent = function (content, isResident) {
             this.editRanges = [];
+            this.lineMap = null;
+            this.setContent(content);
+        }
+        ScriptInfo.prototype.setContent = function (content) {
             this.content = content;
-            this.isResident = isResident;
+            this.lineMap = TypeScript.LineMap1.fromString(content);
+        };
+
+        ScriptInfo.prototype.updateContent = function (content) {
+            this.editRanges = [];
+            this.setContent(content);
             this.version++;
         };
+
         ScriptInfo.prototype.editContent = function (minChar, limChar, newText) {
+            // Apply edits
             var prefix = this.content.substring(0, minChar);
             var middle = newText;
             var suffix = this.content.substring(limChar);
-            this.content = prefix + middle + suffix;
+            this.setContent(prefix + middle + suffix);
+
+            // Store edit range + new length of script
             this.editRanges.push({
                 length: this.content.length,
-                editRange: new TypeScript.ScriptEditRange(minChar, limChar, (limChar - minChar) + newText.length)
+                textChangeRange: new TypeScript.TextChangeRange(TypeScript.TextSpan.fromBounds(minChar, limChar), newText.length)
             });
-            if(this.editRanges.length > this.maxScriptVersions) {
-                this.editRanges.splice(0, this.maxScriptVersions - this.editRanges.length);
-            }
+
+            // Update version #
             this.version++;
         };
-        ScriptInfo.prototype.getEditRangeSinceVersion = function (version) {
-            if(this.version == version) {
-                return null;
+
+        ScriptInfo.prototype.getTextChangeRangeBetweenVersions = function (startVersion, endVersion) {
+            if (startVersion === endVersion) {
+                // No edits!
+                return TypeScript.TextChangeRange.unchanged;
             }
-            var initialEditRangeIndex = this.editRanges.length - (this.version - version);
-            if(initialEditRangeIndex < 0 || initialEditRangeIndex >= this.editRanges.length) {
-                return TypeScript.ScriptEditRange.unknown();
-            }
-            var entries = this.editRanges.slice(initialEditRangeIndex);
-            var minDistFromStart = entries.map(function (x) {
-                return x.editRange.minChar;
-            }).reduce(function (prev, current) {
-                    return Math.min(prev, current);
-                });
-            var minDistFromEnd = entries.map(function (x) {
-                return x.length - x.editRange.limChar;
-            }).reduce(function (prev, current) {
-                    return Math.min(prev, current);
-                });
-            var aggDelta = entries.map(function (x) {
-                return x.editRange.delta;
-            }).reduce(function (prev, current) {
-                    return prev + current;
-                });
-            return new TypeScript.ScriptEditRange(minDistFromStart, entries[0].length - minDistFromEnd, aggDelta);
+
+            var initialEditRangeIndex = this.editRanges.length - (this.version - startVersion);
+            var lastEditRangeIndex = this.editRanges.length - (this.version - endVersion);
+
+            var entries = this.editRanges.slice(initialEditRangeIndex, lastEditRangeIndex);
+            return TypeScript.TextChangeRange.collapseChangesAcrossMultipleVersions(entries.map(function (e) {
+                return e.textChangeRange;
+            }));
         };
         return ScriptInfo;
     })();
     exports.ScriptInfo = ScriptInfo;
-    var TypeScriptLS = (function () {
-        function TypeScriptLS() {
-            this.ls = null;
-            this.scripts = [];
-            this.maxScriptVersions = 100;
+
+    var ScriptSnapshotShim = (function () {
+        function ScriptSnapshotShim(scriptInfo) {
+            this.scriptInfo = scriptInfo;
+            this.lineMap = null;
+            this.textSnapshot = scriptInfo.content;
+            this.version = scriptInfo.version;
         }
-        TypeScriptLS.prototype.addDefaultLibrary = function () {
-            this.addScript("lib.d.ts", Harness.Compiler.libText, true);
+        ScriptSnapshotShim.prototype.getText = function (start, end) {
+            return this.textSnapshot.substring(start, end);
         };
-        TypeScriptLS.prototype.addFile = function (name, isResident) {
-            if (typeof isResident === "undefined") { isResident = false; }
-            var code = Harness.CollateralReader.read(name);
-            this.addScript(name, code, isResident);
+
+        ScriptSnapshotShim.prototype.getLength = function () {
+            return this.textSnapshot.length;
         };
-        TypeScriptLS.prototype.addScript = function (name, content, isResident) {
-            if (typeof isResident === "undefined") { isResident = false; }
-            var script = new ScriptInfo(name, content, isResident, this.maxScriptVersions);
-            this.scripts.push(script);
-        };
-        TypeScriptLS.prototype.updateScript = function (name, content, isResident) {
-            if (typeof isResident === "undefined") { isResident = false; }
-            for(var i = 0; i < this.scripts.length; i++) {
-                if(this.scripts[i].name == name) {
-                    this.scripts[i].updateContent(content, isResident);
-                    return;
-                }
+
+        ScriptSnapshotShim.prototype.getLineStartPositions = function () {
+            if (this.lineMap === null) {
+                this.lineMap = TypeScript.LineMap1.fromString(this.textSnapshot);
             }
-            this.addScript(name, content, isResident);
+
+            return JSON.stringify(this.lineMap.lineStarts());
         };
-        TypeScriptLS.prototype.editScript = function (name, minChar, limChar, newText) {
-            for(var i = 0; i < this.scripts.length; i++) {
-                if(this.scripts[i].name == name) {
-                    this.scripts[i].editContent(minChar, limChar, newText);
-                    return;
-                }
+
+        ScriptSnapshotShim.prototype.getTextChangeRangeSinceVersion = function (scriptVersion) {
+            var range = this.scriptInfo.getTextChangeRangeBetweenVersions(scriptVersion, this.version);
+            if (range === null) {
+                return null;
             }
-            throw new Error("No script with name '" + name + "'");
+
+            return JSON.stringify({ span: { start: range.span().start(), length: range.span().length() }, newLength: range.newLength() });
         };
-        TypeScriptLS.prototype.getScriptContent = function (scriptIndex) {
-            return this.scripts[scriptIndex].content;
+        return ScriptSnapshotShim;
+    })();
+
+    var CancellationToken = (function () {
+        function CancellationToken(cancellationToken) {
+            this.cancellationToken = cancellationToken;
+        }
+        CancellationToken.prototype.isCancellationRequested = function () {
+            return this.cancellationToken && this.cancellationToken.isCancellationRequested();
         };
+        CancellationToken.None = new CancellationToken(null);
+        return CancellationToken;
+    })();
+
+    var TypeScriptLS = (function () {
+        function TypeScriptLS(cancellationToken) {
+            if (typeof cancellationToken === "undefined") { cancellationToken = CancellationToken.None; }
+            this.cancellationToken = cancellationToken;
+            this.ls = null;
+            this.fileNameToScript = {};
+        }
+        TypeScriptLS.prototype.getHostIdentifier = function () {
+            return "TypeScriptLS";
+        };
+
+        TypeScriptLS.prototype.getScriptInfo = function (fileName) {
+            return this.fileNameToScript[fileName];
+        };
+
+        TypeScriptLS.prototype.addScript = function (fileName, content) {
+            this.fileNameToScript[fileName] = new ScriptInfo(fileName, content);
+        };
+
+        TypeScriptLS.prototype.updateScript = function (fileName, content) {
+            var script = this.getScriptInfo(fileName);
+            if (script) {
+                script.updateContent(content);
+                return;
+            }
+
+            this.addScript(fileName, content);
+        };
+
+        TypeScriptLS.prototype.editScript = function (fileName, minChar, limChar, newText) {
+            var script = this.getScriptInfo(fileName);
+            if (script) {
+                script.editContent(minChar, limChar, newText);
+                return;
+            }
+
+            throw new Error("No script with name '" + fileName + "'");
+        };
+
+        //////////////////////////////////////////////////////////////////////
+        // ILogger implementation
+        //
         TypeScriptLS.prototype.information = function () {
-            return true;
+            return false;
         };
         TypeScriptLS.prototype.debug = function () {
             return true;
@@ -129,134 +161,88 @@ define(function(require, exports, module) {
         TypeScriptLS.prototype.fatal = function () {
             return true;
         };
-        TypeScriptLS.prototype.log = function (s) {
 
+        TypeScriptLS.prototype.log = function (s) {
+            // For debugging...
+            //TypeScript.Environment.standardOut.WriteLine("TypeScriptLS:" + s);
         };
+
+        //////////////////////////////////////////////////////////////////////
+        // LanguageServiceShimHost implementation
+        //
+        /// Returns json for Tools.CompilationSettings
         TypeScriptLS.prototype.getCompilationSettings = function () {
-            return "";
+            return JSON.stringify({});
         };
-        TypeScriptLS.prototype.getScriptCount = function () {
-            return this.scripts.length;
+
+        TypeScriptLS.prototype.getCancellationToken = function () {
+            return this.cancellationToken;
         };
-        TypeScriptLS.prototype.getScriptSourceText = function (scriptIndex, start, end) {
-            return this.scripts[scriptIndex].content.substring(start, end);
-        };
-        TypeScriptLS.prototype.getScriptSourceLength = function (scriptIndex) {
-            return this.scripts[scriptIndex].content.length;
-        };
-        TypeScriptLS.prototype.getScriptId = function (scriptIndex) {
-            return this.scripts[scriptIndex].name;
-        };
-        TypeScriptLS.prototype.getScriptIsResident = function (scriptIndex) {
-            return this.scripts[scriptIndex].isResident;
-        };
-        TypeScriptLS.prototype.getScriptVersion = function (scriptIndex) {
-            return this.scripts[scriptIndex].version;
-        };
-        TypeScriptLS.prototype.getScriptEditRangeSinceVersion = function (scriptIndex, scriptVersion) {
-            var range = this.scripts[scriptIndex].getEditRangeSinceVersion(scriptVersion);
-            return (range.minChar + "," + range.limChar + "," + range.delta);
-        };
-        TypeScriptLS.prototype.getLanguageService = function () {
-            var ls = new Services.TypeScriptServicesFactory().createLanguageServiceShim(this);
-            ls.refresh(true);
-            this.ls = ls;
-            return ls;
-        };
-        TypeScriptLS.prototype.parseSourceText = function (fileName, sourceText) {
-            var parser = new TypeScript.Parser();
-            parser.setErrorRecovery(null, -1, -1);
-            parser.errorCallback = function (a, b, c, d) {
-            };
-            var script = parser.parse(sourceText, fileName, 0);
-            return script;
-        };
-        TypeScriptLS.prototype.parseFile = function (fileName) {
-            var sourceText = new TypeScript.StringSourceText(IO.readFile(fileName));
-            return this.parseSourceText(fileName, sourceText);
-        };
-        TypeScriptLS.prototype.lineColToPosition = function (fileName, line, col) {
-            var script = this.ls.languageService.getScriptAST(fileName);
-            assert.notNull(script);
-            assert(line >= 1);
-            assert(col >= 1);
-            assert(line < script.locationInfo.lineMap.length);
-            return TypeScript.getPositionFromLineColumn(script, line, col);
-        };
-        TypeScriptLS.prototype.positionToLineCol = function (fileName, position) {
-            var script = this.ls.languageService.getScriptAST(fileName);
-            assert.notNull(script);
-            var result = TypeScript.getLineColumnFromPosition(script, position);
-            assert(result.line >= 1);
-            assert(result.col >= 1);
-            return result;
-        };
-        TypeScriptLS.prototype.checkEdits = function (sourceFileName, baselineFileName, edits) {
-            var script = Harness.CollateralReader.read(sourceFileName);
-            var formattedScript = this.applyEdits(script, edits);
-            var baseline = Harness.CollateralReader.read(baselineFileName);
-            assert.noDiff(formattedScript, baseline);
-            assert.equal(formattedScript, baseline);
-        };
-        TypeScriptLS.prototype.applyEdits = function (content, edits) {
-            var result = content;
-            edits = this.normalizeEdits(edits);
-            for(var i = edits.length - 1; i >= 0; i--) {
-                var edit = edits[i];
-                var prefix = result.substring(0, edit.minChar);
-                var middle = edit.text;
-                var suffix = result.substring(edit.limChar);
-                result = prefix + middle + suffix;
-            }
-            return result;
-        };
-        TypeScriptLS.prototype.normalizeEdits = function (edits) {
-            var result = [];
-            function mapEdits(edits) {
-                var result = [];
-                for(var i = 0; i < edits.length; i++) {
-                    result.push({
-                        edit: edits[i],
-                        index: i
-                    });
-                }
-                return result;
-            }
-            var temp = mapEdits(edits).sort(function (a, b) {
-                var result = a.edit.minChar - b.edit.minChar;
-                if(result == 0) {
-                    result = a.index - b.index;
-                }
-                return result;
+
+        TypeScriptLS.prototype.getScriptFileNames = function () {
+            var fileNames = [];
+            ts.forEachKey(this.fileNameToScript, function (fileName) {
+                fileNames.push(fileName);
             });
-            var current = 0;
-            var next = 1;
-            while(current < temp.length) {
-                var currentEdit = temp[current].edit;
-                if(next >= temp.length) {
-                    result.push(currentEdit);
-                    current++;
-                    continue;
-                }
-                var nextEdit = temp[next].edit;
-                var gap = nextEdit.minChar - currentEdit.limChar;
-                if(gap >= 0) {
-                    result.push(currentEdit);
-                    current = next;
-                    next++;
-                    continue;
-                }
-                if(currentEdit.limChar >= nextEdit.limChar) {
-                    next++;
-                    continue;
-                } else {
-                    throw new Error("Trying to apply overlapping edits");
-                }
-            }
-            return result;
+            return JSON.stringify(fileNames);
+        };
+
+        TypeScriptLS.prototype.getScriptSnapshot = function (fileName) {
+            return new ScriptSnapshotShim(this.getScriptInfo(fileName));
+        };
+
+        TypeScriptLS.prototype.getScriptVersion = function (fileName) {
+            return this.getScriptInfo(fileName).version;
+        };
+
+        TypeScriptLS.prototype.getScriptIsOpen = function (fileName) {
+            return this.getScriptInfo(fileName).isOpen;
+        };
+
+        TypeScriptLS.prototype.getLocalizedDiagnosticMessages = function () {
+            return JSON.stringify({});
+        };
+
+        /** Return a new instance of the language service shim, up-to-date wrt to typecheck.
+        *  To access the non-shim (i.e. actual) language service, use the "ls.languageService" property.
+        */
+        TypeScriptLS.prototype.getLanguageService = function () {
+            return this.ls = new TypeScript.Services.TypeScriptServicesFactory().createLanguageServiceShim(this);
+        };
+
+        /** Parse file given its source text */
+        TypeScriptLS.prototype.parseSourceText = function (fileName, sourceText) {
+            return TypeScript.Parser.parse(fileName, TypeScript.SimpleText.fromScriptSnapshot(sourceText), 1 /* ES5 */, TypeScript.isDTSFile(fileName)).sourceUnit();
+        };
+
+        /**
+        * @param line 1 based index
+        * @param col 1 based index
+        */
+        TypeScriptLS.prototype.lineColToPosition = function (fileName, line, col) {
+            var script = this.fileNameToScript[fileName];
+            assert.isNotNull(script);
+            assert.isTrue(line >= 1);
+            assert.isTrue(col >= 1);
+
+            return script.lineMap.getPosition(line - 1, col - 1);
+        };
+
+        /**
+        * @param line 0 based index
+        * @param col 0 based index
+        */
+        TypeScriptLS.prototype.positionToZeroBasedLineCol = function (fileName, position) {
+            var script = this.fileNameToScript[fileName];
+            assert.isNotNull(script);
+
+            var result = script.lineMap.getLineAndCharacterFromPosition(position);
+
+            assert.isTrue(result.line() >= 0);
+            assert.isTrue(result.character() >= 0);
+            return { line: result.line(), character: result.character() };
         };
         return TypeScriptLS;
     })();
     exports.TypeScriptLS = TypeScriptLS;
-
 });
